@@ -1,20 +1,199 @@
-# Reproducible Research: Peer Assessment 1
+---
+title: "PA1_template"
+output: html_document
+---
 
+# Reproducible Research: Peer Assessment 1
 
 ## Loading and preprocessing the data
 
+1. The data located in my working directory have been loaded in to Rstudio.
 
+```{r, echo=TRUE}
+data <- read.csv("./activity.csv")
+```
+
+2. The only transformation of data done is a variable "date" is coerced to a "Date" format. Later on it will help to create variable that indictes the weekdays. 
+
+```{r, echo=TRUE}
+data$date <- as.Date(data$date)
+```
 
 ## What is mean total number of steps taken per day?
 
+1. In order to make a histogramm of total number of steps taken per day first the vector of total daily number of steps was created. 
 
+```{r, echo=TRUE}
+tot.steps <- tapply(data$steps, data$date, FUN = sum)
+```
+
+Then then the histogramm was drawn.
+
+```{r, echo=TRUE}
+hist(tot.steps, main = "Histogram of total number of steps per day", xlab = "Total number of steps per day")
+```
+
+2. The mean and median total number of steps taken per day was calculated.
+
+
+```{r, echo=TRUE}
+mean.steps <- mean(tot.steps, na.rm = TRUE)
+mean.steps
+median.steps <- median(tot.steps, na.rm = TRUE)
+median.steps
+```
 
 ## What is the average daily activity pattern?
 
+1. In order to create the plot, the average number of steps of 5-minute intervals averaged across all days was calculated.
 
+```{r, echo=TRUE}
+# create vector of average number of steps of time intervals
+ave.steps <- tapply(data$steps, data$interval, FUN = mean, na.rm = TRUE)
+# chage it to a data frame 
+ave.steps <- as.data.frame(ave.steps)
+# create vector of time intervals
+intervals <- tapply(data$interval, data$interval, FUN = mean)
+# bind vector of intervals to the data frame
+ave.steps <- cbind(ave.steps,intervals)
+```
+
+The time series plot of the 5-minute intervals and the average number of steps taken, averaged across all days, was made.
+
+```{r, echo=TRUE}
+plot(ave.steps$intervals, ave.steps$ave.steps, type = "l", main = "Average number of steps across all days", xlab = "Interval", ylab = "Average number of steps")
+```
+
+2. On average across all the days the maximum number of steps 
+
+```{r, echo=TRUE}
+max.steps <- max(ave.steps$ave.steps)
+```
+
+```{r, echo=TRUE}
+max.int <- as.numeric(ave.steps[ave.steps$ave.steps==max.steps,2])
+```
+
+is contained in the 5-minute interval "`r max.int`".
 
 ## Imputing missing values
 
+1. 
 
+```{r, echo=TRUE}
+nacount <- sum(is.na(data$steps))
+```
+
+The total number of missing values in the dataset is `r nacount`.
+
+2. All missing values of variable "steps" are going to be filled in with the mean value of the number of taken steps for that day and for that 5-minute interval.
+
+3. New dataset "data.imp" is created copying the original dataset "data".
+
+```{r, echo=TRUE}
+data.imp <- data
+```
+
+A new variable "weekday" is created indicating which day of the week each record is.
+
+```{r, echo=TRUE}
+data.imp$weekday <- weekdays(data.imp$date, abbreviate = TRUE)
+```
+
+The average number of steps taken for each 5-minute interval of a day is calculated. These values will be used for imputation.
+
+```{r, echo=TRUE}
+imp.val <- aggregate(data.imp$steps, by = list(data.imp$interval, data.imp$weekday), mean, na.rm = TRUE)
+```
+
+The names of variables are allocated.
+
+```{r, echo=TRUE}
+names(imp.val) <- c("interval", "weekday", "x")
+```
+
+Calculated values for imputation are added to the dataset.
+
+```{r, echo=TRUE}
+data.imp <- merge(data.imp, imp.val, by = c("weekday", "interval"))
+```
+
+Missing values are replaced with calculated non-missing values.
+
+```{r, echo=TRUE}
+data.imp$steps[is.na(data.imp$steps)] <- data.imp$x[is.na(data.imp$steps)]
+```
+
+Unnecessary variables are removed.
+
+```{r, echo=TRUE}
+data.imp$x <- NULL
+data.imp$finval <- NULL
+```
+
+Now the dataset that is equal to the original dataset but with the missing data filled in is created.
+
+4. In order to create a histogramm of total number of steps taken per day taking into accout imputed values, one need to calculate new values of total daily numbers of steps. 
+
+```{r, echo=TRUE}
+tot.steps2 <- tapply(data.imp$steps, data.imp$date, FUN = sum)
+```
+
+Now the histogram can be made.
+
+```{r, echo=TRUE}
+hist(tot.steps2, main = "Histogram of total number of steps per day (2)", xlab = "Total number of steps per day")
+```
+
+The new mean and median (taking into account the imputed values) total number of steps taken per day are
+
+```{r, echo=TRUE}
+mean.steps2 <- mean(tot.steps2, na.rm = TRUE)
+mean.steps2
+median.steps2 <- median(tot.steps2, na.rm = TRUE)
+median.steps2
+```
+
+These values differ from the estimates from the first part of the assignment. The imputing missing data increased both the mean and the median of the total daily number of steps.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+1. A new factor variable in the dataset with two levels ??? ´weekday¡ and ´weekend¡ indicating whether a given date is a weekday or weekend day, will be created. Here the variable "weekday" that was created before is going to be exploited.
+
+```{r, echo=TRUE}
+data.imp$wend <- as.factor(ifelse(data.imp$weekday %in% c("se", "sv"), c("weekend"), c("weekday")))
+```
+
+2. For making a panel plot containing a time series plot, first the the average number of steps, averaged across all weekday days or weekend days, for the 5-minute interval will be calculated and turned into a data frame.
+
+```{r, echo=TRUE}
+ave.steps2 <- tapply(data.imp$steps, list(data.imp$interval,data.imp$wend), FUN = mean, na.rm = TRUE)
+ave.steps2 <- as.data.frame(ave.steps2)
+```
+
+The vector of 5-minute intervals is created and added to the data frame.
+
+```{r, echo=TRUE}
+intervals2 <- tapply(data.imp$interval, data.imp$interval, FUN = mean)
+ave.steps2 <- cbind(ave.steps2,intervals2)
+```
+
+For melting "weekdays" and "weekends" in one variable, the "reshape2" library is called.
+
+```{r, echo=TRUE}
+library(reshape2)
+ave.steps3 <- melt(ave.steps2, id=c("intervals2"))
+```
+
+The names of variables are added.
+
+```{r, echo=TRUE}
+names(ave.steps3) <- c("Interval","weekdays","average.steps")
+```
+
+Finally the library "lattice" is called and panel plot containing a time series plot of the 5-minute intervals and the average number of steps taken, averaged across all weekday days or weekend days, is made.
+
+```{r, echo=TRUE}
+library(lattice)
+xyplot(average.steps ~ Interval | weekdays, data=ave.steps3, type = 'l', layout=(c(1,2)), ylab="Number of steps" )
+```
